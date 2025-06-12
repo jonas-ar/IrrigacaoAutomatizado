@@ -77,6 +77,7 @@ void vTaskComunicacao(void *pvParameters);
 void setup() {
   Serial.begin(115200); // configura o serial
   pinMode(PIN_UMIDADE_SOLO, INPUT); // configura o pino para o sensor de umidade do solo
+  pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
   // cria as filas
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
   fila_chuva = xQueueCreate(5, sizeof(int));
