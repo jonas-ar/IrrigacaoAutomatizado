@@ -6,19 +6,21 @@
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
-#define PIN_RELE 27
-#define PIN_TRIG 26
-#define PIN_ECHO 25
-#define PIN_CHUVA 5
+#define PIN_RELE 8
+#define PIN_TRIG 5 // pino do sensor ultrassônico
+#define PIN_ECHO 18 // pino do sensor ultrassônico
+#define PIN_CHUVA 27
 
 // Definição das filas
 xQueueHandle fila_umidade_solo;
 xQueueHandle fila_chuva;
+xQueueHandle fila_nivel_agua;
 
 // Handles das tasks
 TaskHandle_t handleSoloTask = NULL;
 TaskHandle_t handleIrrigacaoTask = NULL;
 TaskHandle_t handleChuvaTask = NULL;
+TaskHandle_t handleNivelAgua = NULL;
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters) {
@@ -51,8 +53,30 @@ void vTaskChuva(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(2000));
   }
 }
+
 // Task para realizar a leitura do sensor ultrassônico
-void vTaskNivelAgua(void *pvParameters);
+void vTaskNivelAgua(void *pvParameters) {
+  long duracao;
+  float distancia_cm;
+
+  while(1) {
+    digitalWrite(PIN_TRIG, LOW);
+    delayMicroseconds(2);
+    digitalWrite(PIN_TRIG, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(PIN_TRIG, LOW);
+
+    // medição do tempo de retorno do pulso
+    duracao = pulseIn(PIN_ECHO, HIGH);
+
+    // calcula a distância em cm
+    distancia_cm = duracao * 0.034 / 2;
+
+    xQueueSend(fila_nivel_agua, &distancia_cm, portMAX_DELAY);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+  }
+}
+
 // Task para realizar a irrigação. Implementar a lógica para acionar o motor após chuva intensa e muita umidade do solo
 void vTaskIrrigacao(void *pvParameters) {
   int solo_medicao;
@@ -81,10 +105,12 @@ void setup() {
   // cria as filas
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
   fila_chuva = xQueueCreate(5, sizeof(int));
+  fila_nivel_agua = xQueueCreate(5, sizeof(float));
   // cria as tasks
   xTaskCreate(vTaskSolo, "TASK_SOLO", 2048, NULL, 1, &handleSoloTask);
   xTaskCreate(vTaskChuva, "TASK_CHUVA", 2048, NULL, 1, &handleChuvaTask);
-  xTaskCreate(vTaskIrrigacao, "TASK_IRRIGACAO", 2048, NULL, 1, &handleIrrigacaoTask);
+  xTaskCreate(vTaskIrrigacao, "TASK_IRRIGACAO", 3072, NULL, 1, &handleIrrigacaoTask);
+  xTaskCreate(vTaskNivelAgua, "TASK_NIVEL_AGUA", 2048, NULL, 1, &handleNivelAgua);
 }
 
 void loop() {
