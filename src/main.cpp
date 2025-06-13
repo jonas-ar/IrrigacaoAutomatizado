@@ -3,24 +3,32 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include <Stepper.h>
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
-#define PIN_RELE 8
+#define PIN_RELE_MOTOR 8 //Rele para ligar motor
 #define PIN_TRIG 5 // pino do sensor ultrassônico
 #define PIN_ECHO 18 // pino do sensor ultrassônico
 #define PIN_CHUVA 27
+#define PIN_IN1 16  //pinos de configuração motor de passo
+#define PIN_IN2 4 //pinos de configuração motor de passo
+#define PIN_IN3 2 //pinos de configuração motor de passo
+#define PIN_IN4 15 //pinos de configuração motor de passo
 
 // Definição das filas
 xQueueHandle fila_umidade_solo;
 xQueueHandle fila_chuva;
 xQueueHandle fila_nivel_agua;
+xQueueHandle fila_ligar_motor_lona;
 
 // Handles das tasks
 TaskHandle_t handleSoloTask = NULL;
 TaskHandle_t handleIrrigacaoTask = NULL;
 TaskHandle_t handleChuvaTask = NULL;
 TaskHandle_t handleNivelAgua = NULL;
+TaskHandle_t handleLigarMotor = NULL;
+
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters) {
@@ -91,6 +99,7 @@ void vTaskIrrigacao(void *pvParameters) {
       Serial.printf("Valor bruto do sensor de umidade do solo: %d \n", solo_medicao);
       Serial.printf("Valor bruto do sensor de chuva: %d \n", chuva_medicao);
       Serial.printf("Distância em cm: %f\n", nivel_medicao);
+     // Serial.printf("Se ligado motor igual a 1:%f\n", fila_ligar_motor_lona);
 
     } else {
       ESP_LOGE("Medição", "dados não disponíveis");
@@ -107,15 +116,19 @@ void setup() {
   pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
   pinMode(PIN_ECHO, INPUT);//configura o pino echo do sensor ultrassonico
   pinMode(PIN_TRIG, OUTPUT);//configura o pino trig do sensor ultrassonico
+  pinMode(PIN_RELE_MOTOR, OUTPUT); //configura pino rele motor
+  digitalWrite(PIN_RELE_MOTOR, LOW);
   // cria as filas
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
   fila_chuva = xQueueCreate(5, sizeof(int));
   fila_nivel_agua = xQueueCreate(5, sizeof(float));
+
   // cria as tasks
   xTaskCreate(vTaskSolo, "TASK_SOLO", 2048, NULL, 1, &handleSoloTask);
   xTaskCreate(vTaskChuva, "TASK_CHUVA", 2048, NULL, 1, &handleChuvaTask);
   xTaskCreate(vTaskIrrigacao, "TASK_IRRIGACAO", 3072, NULL, 1, &handleIrrigacaoTask);
   xTaskCreate(vTaskNivelAgua, "TASK_NIVEL_AGUA", 2048, NULL, 1, &handleNivelAgua);
+
 }
 
 void loop() {
