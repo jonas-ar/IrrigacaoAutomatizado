@@ -3,11 +3,10 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
-#include <Stepper.h>
+#include <AccelStepper.h>
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
-#define PIN_RELE_MOTOR 8 //Rele para ligar motor
 #define PIN_TRIG 5 // pino do sensor ultrassônico
 #define PIN_ECHO 18 // pino do sensor ultrassônico
 #define PIN_CHUVA 27
@@ -20,15 +19,12 @@
 xQueueHandle fila_umidade_solo;
 xQueueHandle fila_chuva;
 xQueueHandle fila_nivel_agua;
-xQueueHandle fila_ligar_motor_lona;
 
 // Handles das tasks
 TaskHandle_t handleSoloTask = NULL;
 TaskHandle_t handleIrrigacaoTask = NULL;
 TaskHandle_t handleChuvaTask = NULL;
 TaskHandle_t handleNivelAgua = NULL;
-TaskHandle_t handleLigarMotor = NULL;
-
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters) {
@@ -36,11 +32,11 @@ void vTaskSolo(void *pvParameters) {
     int leituraADC = analogRead(PIN_UMIDADE_SOLO);
     long resposta = xQueueSend(fila_umidade_solo, &leituraADC, portMAX_DELAY);
     
-    if (resposta) {
-      ESP_LOGI("Leitura", "umidade de solo adicionado à fila");
-    } else {
-      ESP_LOGE("Leitura", "Falha ao enviar o dado de umidade de solo à fila");
-    }
+    // if (resposta) {
+    //   ESP_LOGI("Leitura", "umidade de solo adicionado à fila");
+    // } else {
+    //   ESP_LOGE("Leitura", "Falha ao enviar o dado de umidade de solo à fila");
+    // }
 
     vTaskDelay(pdMS_TO_TICKS(2000));
   }
@@ -52,11 +48,11 @@ void vTaskChuva(void *pvParameters) {
     int leituraADC = analogRead(PIN_CHUVA);
     long resposta = xQueueSend(fila_chuva, &leituraADC, portMAX_DELAY);
 
-    if (resposta) {
-      ESP_LOGI("Leitura", "sensor chuva adicionado à fila");
-    } else {
-      ESP_LOGE("Leitura", "Falha ao enviar o dado do sensor de chuva à fila");
-    }
+    // if (resposta) {
+    //   ESP_LOGI("Leitura", "sensor chuva adicionado à fila");
+    // } else {
+    //   ESP_LOGE("Leitura", "Falha ao enviar o dado do sensor de chuva à fila");
+    // }
 
     vTaskDelay(pdMS_TO_TICKS(2000));
   }
@@ -85,11 +81,21 @@ void vTaskNivelAgua(void *pvParameters) {
   }
 }
 
+// instância do motor
+AccelStepper stepper(AccelStepper::FULL4WIRE, PIN_IN1, PIN_IN3, PIN_IN2, PIN_IN4);
+
 // Task para realizar a irrigação. Implementar a lógica para acionar o motor após chuva intensa e muita umidade do solo
 void vTaskIrrigacao(void *pvParameters) {
   int solo_medicao;
   int chuva_medicao;
   float nivel_medicao;
+
+  // configurações do motor de passo
+  stepper.setMaxSpeed(500);
+  stepper.setAcceleration(200);
+  stepper.setSpeed(50);
+  const int limiar_chuva = 4095; // calibrar este valor
+  bool lonaFechada = false;
 
   while(1) {
     if (xQueueReceive(fila_umidade_solo, &solo_medicao, portMAX_DELAY) &&
@@ -98,12 +104,39 @@ void vTaskIrrigacao(void *pvParameters) {
 
       Serial.printf("Valor bruto do sensor de umidade do solo: %d \n", solo_medicao);
       Serial.printf("Valor bruto do sensor de chuva: %d \n", chuva_medicao);
-      Serial.printf("Distância em cm: %f\n", nivel_medicao);
-     // Serial.printf("Se ligado motor igual a 1:%f\n", fila_ligar_motor_lona);
+      Serial.printf("Distância em cm: %f\n\n", nivel_medicao);
+
+      // se estiver chovendo e o estado atual da lona for aberta, será fechado
+      if (chuva_medicao < limiar_chuva && !lonaFechada) {
+        Serial.println("Está chovendo! acionando cobertura...");
+        stepper.moveTo(stepper.currentPosition() + 2048); // fecha a cobertura
+
+        while (stepper.distanceToGo() != 0) {
+          stepper.run();
+          vTaskDelay(pdMS_TO_TICKS(1)); // libera CPU
+        }
+
+        lonaFechada = true;
+      }
+
+      // se a chuva parar e o estado atual da lona for fechado, será aberto
+      if (chuva_medicao >= limiar_chuva && lonaFechada) {
+        Serial.println("Parou de chover! abrindo cobertura...");
+        stepper.moveTo(stepper.currentPosition() - 2048); // abre a cobertura
+
+        while (stepper.distanceToGo() != 0) {
+          stepper.run();
+          vTaskDelay(pdMS_TO_TICKS(1)); // libera CPU
+        }
+
+        lonaFechada = false;
+      }
 
     } else {
       ESP_LOGE("Medição", "dados não disponíveis");
     }
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
   }
 };
 
@@ -116,8 +149,6 @@ void setup() {
   pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
   pinMode(PIN_ECHO, INPUT);//configura o pino echo do sensor ultrassonico
   pinMode(PIN_TRIG, OUTPUT);//configura o pino trig do sensor ultrassonico
-  pinMode(PIN_RELE_MOTOR, OUTPUT); //configura pino rele motor
-  digitalWrite(PIN_RELE_MOTOR, LOW);
   // cria as filas
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
   fila_chuva = xQueueCreate(5, sizeof(int));
@@ -128,7 +159,6 @@ void setup() {
   xTaskCreate(vTaskChuva, "TASK_CHUVA", 2048, NULL, 1, &handleChuvaTask);
   xTaskCreate(vTaskIrrigacao, "TASK_IRRIGACAO", 3072, NULL, 1, &handleIrrigacaoTask);
   xTaskCreate(vTaskNivelAgua, "TASK_NIVEL_AGUA", 2048, NULL, 1, &handleNivelAgua);
-
 }
 
 void loop() {
