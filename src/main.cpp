@@ -45,7 +45,7 @@ void vTaskSolo(void *pvParameters) {
 // Task para realizar a leitura do sensor de chuva
 void vTaskChuva(void *pvParameters) {
   while(1) {
-    int leituraADC = analogRead(PIN_CHUVA);
+    int leituraADC = digitalRead(PIN_CHUVA); // 0 chuva, 1 não chuva
     long resposta = xQueueSend(fila_chuva, &leituraADC, portMAX_DELAY);
 
     // if (resposta) {
@@ -87,27 +87,26 @@ AccelStepper stepper(AccelStepper::FULL4WIRE, PIN_IN1, PIN_IN3, PIN_IN2, PIN_IN4
 // Task para realizar a irrigação. Implementar a lógica para acionar o motor após chuva intensa e muita umidade do solo
 void vTaskIrrigacao(void *pvParameters) {
   int solo_medicao;
-  int chuva_medicao;
+  int estado_chuva;
   float nivel_medicao;
 
   // configurações do motor de passo
   stepper.setMaxSpeed(500);
   stepper.setAcceleration(200);
   stepper.setSpeed(50);
-  const int limiar_chuva = 4095; // calibrar este valor
   bool lonaFechada = false;
 
   while(1) {
     if (xQueueReceive(fila_umidade_solo, &solo_medicao, portMAX_DELAY) &&
-        xQueueReceive(fila_chuva, &chuva_medicao, portMAX_DELAY) &&
+        xQueueReceive(fila_chuva, &estado_chuva, portMAX_DELAY) &&
         xQueueReceive(fila_nivel_agua, &nivel_medicao, portMAX_DELAY)) {
 
       Serial.printf("Valor bruto do sensor de umidade do solo: %d \n", solo_medicao);
-      Serial.printf("Valor bruto do sensor de chuva: %d \n", chuva_medicao);
+      Serial.printf("Valor bruto do sensor de chuva (0 chovendo, 1 sem chover): %d \n", estado_chuva);
       Serial.printf("Distância em cm: %f\n\n", nivel_medicao);
 
       // se estiver chovendo e o estado atual da lona for aberta, será fechado
-      if (chuva_medicao < limiar_chuva && !lonaFechada) {
+      if (estado_chuva == 0 && !lonaFechada) {
         Serial.println("Está chovendo! acionando cobertura...");
         stepper.moveTo(stepper.currentPosition() + 2048); // fecha a cobertura
 
@@ -120,7 +119,7 @@ void vTaskIrrigacao(void *pvParameters) {
       }
 
       // se a chuva parar e o estado atual da lona for fechado, será aberto
-      if (chuva_medicao >= limiar_chuva && lonaFechada) {
+      if (estado_chuva == 1 && lonaFechada) {
         Serial.println("Parou de chover! abrindo cobertura...");
         stepper.moveTo(stepper.currentPosition() - 2048); // abre a cobertura
 
