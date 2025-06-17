@@ -14,6 +14,7 @@
 #define PIN_IN2 4 //pinos de configuração motor de passo
 #define PIN_IN3 2 //pinos de configuração motor de passo
 #define PIN_IN4 15 //pinos de configuração motor de passo
+#define PIN_RELE 17
 
 // Definição das filas
 xQueueHandle fila_umidade_solo;
@@ -105,6 +106,14 @@ void vTaskIrrigacao(void *pvParameters) {
       Serial.printf("Valor bruto do sensor de chuva (0 chovendo, 1 sem chover): %d \n", estado_chuva);
       Serial.printf("Distância em cm: %f\n\n", nivel_medicao);
 
+      if(solo_medicao > 2500) {
+        Serial.println("RELE LIGADO, BAIXA HUMIDADE DO SOLO");
+        digitalWrite(PIN_RELE, HIGH);
+      } else {
+        Serial.println("RELE DESLIGADO, UMIDADE ESTA OK!");
+        digitalWrite(PIN_RELE, LOW);
+      }      
+
       // se estiver chovendo e o estado atual da lona for aberta, será fechado
       if (estado_chuva == 0 && !lonaFechada) {
         Serial.println("Está chovendo! acionando cobertura...");
@@ -148,6 +157,7 @@ void setup() {
   pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
   pinMode(PIN_ECHO, INPUT);//configura o pino echo do sensor ultrassonico
   pinMode(PIN_TRIG, OUTPUT);//configura o pino trig do sensor ultrassonico
+  pinMode(PIN_RELE, OUTPUT);
   // cria as filas
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
   fila_chuva = xQueueCreate(5, sizeof(int));
