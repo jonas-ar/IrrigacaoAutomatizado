@@ -19,15 +19,15 @@
 #define PIN_RELE 17
 
 // Definição das filas
-xQueueHandle fila_umidade_solo;
-xQueueHandle fila_chuva;
-xQueueHandle fila_nivel_agua;
+extern xQueueHandle fila_umidade_solo;
+extern xQueueHandle fila_chuva;
+extern xQueueHandle fila_nivel_agua;
 
 // Handles das tasks
-TaskHandle_t handleSoloTask = NULL;
-TaskHandle_t handleIrrigacaoTask = NULL;
-TaskHandle_t handleChuvaTask = NULL;
-TaskHandle_t handleNivelAgua = NULL;
+extern TaskHandle_t handleSoloTask;
+extern TaskHandle_t handleIrrigacaoTask;
+extern TaskHandle_t handleChuvaTask;
+extern TaskHandle_t handleNivelAgua;
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters);

@@ -1,4 +1,15 @@
-#include "tasks.h"
+#include "tasks.hpp"
+
+// Definição das filas
+QueueHandle_t fila_umidade_solo;
+QueueHandle_t fila_chuva;
+QueueHandle_t fila_nivel_agua;
+
+// Handles das tasks
+TaskHandle_t handleSoloTask;
+TaskHandle_t handleChuvaTask;
+TaskHandle_t handleIrrigacaoTask;
+TaskHandle_t handleNivelAgua;
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters) {
@@ -6,7 +17,7 @@ void vTaskSolo(void *pvParameters) {
     int leituraADC = analogRead(PIN_UMIDADE_SOLO);
     long resposta = xQueueSend(fila_umidade_solo, &leituraADC, portMAX_DELAY);
     
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
@@ -16,7 +27,7 @@ void vTaskChuva(void *pvParameters) {
     int leituraADC = digitalRead(PIN_CHUVA); // 0 chuva, 1 não chuva
     long resposta = xQueueSend(fila_chuva, &leituraADC, portMAX_DELAY);
 
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
@@ -39,7 +50,7 @@ void vTaskNivelAgua(void *pvParameters) {
     distancia_cm = duracao * 0.034 / 2;
 
     xQueueSend(fila_nivel_agua, &distancia_cm, portMAX_DELAY);
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
@@ -105,7 +116,7 @@ void vTaskIrrigacao(void *pvParameters) {
       ESP_LOGE("Medição", "dados não disponíveis");
     }
 
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 };
 
