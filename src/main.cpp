@@ -11,11 +11,13 @@ void setup() {
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
   fila_chuva = xQueueCreate(5, sizeof(int));
   fila_nivel_agua = xQueueCreate(5, sizeof(float));
+  fila_dados_irrigacao = xQueueCreate(5, sizeof(DadosIrrigacao));
   // cria as tasks
   xTaskCreate(vTaskSolo, "TASK_SOLO", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleSoloTask);
   xTaskCreate(vTaskChuva, "TASK_CHUVA", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleChuvaTask);
   xTaskCreate(vTaskIrrigacao, "TASK_IRRIGACAO", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleIrrigacaoTask);
   xTaskCreate(vTaskNivelAgua, "TASK_NIVEL_AGUA", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleNivelAgua);
+  xTaskCreate(vTaskComunicacao, "TASK_WIFI", configMINIMAL_STACK_SIZE + 2028, NULL, 1, &handleComunicacao);
 }
 
 void loop() {
