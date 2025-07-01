@@ -6,6 +6,8 @@
 #include "freertos/semphr.h"
 #include "esp_log.h"
 #include <AccelStepper.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
@@ -22,12 +24,21 @@
 extern xQueueHandle fila_umidade_solo;
 extern xQueueHandle fila_chuva;
 extern xQueueHandle fila_nivel_agua;
+extern xQueueHandle fila_dados_irrigacao;
 
 // Handles das tasks
 extern TaskHandle_t handleSoloTask;
 extern TaskHandle_t handleIrrigacaoTask;
 extern TaskHandle_t handleChuvaTask;
 extern TaskHandle_t handleNivelAgua;
+extern TaskHandle_t handleComunicacao;
+
+// estrutura de dados para o envio por wi-fi
+typedef struct {
+    int umidade_solo;
+    int estado_chuva;
+    float nivel_agua;
+} DadosIrrigacao;
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters);
