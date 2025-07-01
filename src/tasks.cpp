@@ -4,12 +4,19 @@
 QueueHandle_t fila_umidade_solo;
 QueueHandle_t fila_chuva;
 QueueHandle_t fila_nivel_agua;
+QueueHandle_t fila_dados_irrigacao;
 
 // Handles das tasks
 TaskHandle_t handleSoloTask;
 TaskHandle_t handleChuvaTask;
 TaskHandle_t handleIrrigacaoTask;
 TaskHandle_t handleNivelAgua;
+TaskHandle_t handleComunicacao;
+
+// dados referente ao Wi-Fi
+const char* ssid = "NOME_REDE_WIFI";
+const char* senha = "SENHA_REDE_WIFI";
+const char* url = "http://exemplo.servidor/dados";
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters) {
@@ -112,6 +119,14 @@ void vTaskIrrigacao(void *pvParameters) {
         lonaFechada = false;
       }
 
+      // envia os dados para a task de comunicação
+      DadosIrrigacao dados; // faz a instância
+      dados.umidade_solo = solo_medicao;
+      dados.nivel_agua = nivel_medicao;
+      dados.estado_chuva = estado_chuva;
+
+      xQueueSend(fila_dados_irrigacao, &dados, portMAX_DELAY);
+
     } else {
       ESP_LOGE("Medição", "dados não disponíveis");
     }
@@ -121,4 +136,42 @@ void vTaskIrrigacao(void *pvParameters) {
 };
 
 // Task para enviar os dados por wi-fi
-void vTaskComunicacao(void *pvParameters);
+void vTaskComunicacao(void *pvParameters) {
+  DadosIrrigacao dados;
+  
+  // faz a conexão com wi-fi
+  WiFi.begin(ssid, senha);
+  Serial.print("Conectando ao Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    vTaskDelay(pdMS_TO_TICKS(500));
+    Serial.print(".");
+  }
+  Serial.println("\nWi-Fi conectado.");
+  
+  while(1) {
+    if (xQueueReceive(fila_dados_irrigacao, &dados, portMAX_DELAY)) {
+      Serial.println("Dados recebidos para envio por HTTP");
+
+      HTTPClient http;
+      http.begin(url);
+      http.addHeader("Content-Type", "application/json");
+
+      // monta o json
+      String json = String("{\"umidade\":") + dados.umidade_solo +
+                    ",\"chuva\":" + dados.estado_chuva +
+                    ",\"nivel_agua\":" + dados.nivel_agua + "}";
+
+      int response = http.POST(json);
+
+      if (response > 0) {
+        Serial.printf("HTTP %d: %s\n", response, http.getString().c_str());
+      } else {
+        Serial.printf("ERRO HTTP %s\n", http.errorToString(response).c_str());
+      }
+
+      http.end();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
+  }
+}
