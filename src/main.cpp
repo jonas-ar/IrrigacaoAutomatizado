@@ -13,13 +13,13 @@ void setup() {
   fila_nivel_agua = xQueueCreate(5, sizeof(float));
   fila_dados_irrigacao = xQueueCreate(5, sizeof(DadosIrrigacao));
   // cria as tasks
-  xTaskCreate(vTaskSolo, "TASK_SOLO", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleSoloTask);
-  xTaskCreate(vTaskChuva, "TASK_CHUVA", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleChuvaTask);
-  xTaskCreate(vTaskIrrigacao, "TASK_IRRIGACAO", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleIrrigacaoTask);
-  xTaskCreate(vTaskNivelAgua, "TASK_NIVEL_AGUA", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleNivelAgua);
-  xTaskCreate(vTaskComunicacao, "TASK_WIFI", configMINIMAL_STACK_SIZE + 2028, NULL, 1, &handleComunicacao);
+  xTaskCreatePinnedToCore(vTaskSolo, "TASK_SOLO", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleSoloTask, 1);
+  xTaskCreatePinnedToCore(vTaskChuva, "TASK_CHUVA", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleChuvaTask, 1);
+  xTaskCreatePinnedToCore(vTaskIrrigacao, "TASK_IRRIGACAO", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleIrrigacaoTask, 0);
+  xTaskCreatePinnedToCore(vTaskNivelAgua, "TASK_NIVEL_AGUA", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleNivelAgua, 1);
+  xTaskCreatePinnedToCore(vTaskComunicacao, "TASK_WIFI", configMINIMAL_STACK_SIZE + 2028, NULL, 1, &handleComunicacao, 0);
 }
 
 void loop() {
-  vTaskDelay(pdMS_TO_TICKS(2000));
+  vTaskDelay(pdMS_TO_TICKS(500));
 }
