@@ -1,4 +1,5 @@
 #include "tasks.hpp"
+#include "ultrassom_interrupcao.hpp"
 
 // dados referente ao Wi-Fi
 const char* ssid = "NOME_REDE_WIFI";
@@ -52,8 +53,7 @@ void vTaskNivelAgua(void *pvParameters) {
       delayMicroseconds(10);
       digitalWrite(PIN_TRIG, LOW);
 
-      duracao = pulseIn(PIN_ECHO, HIGH);
-      leituras[i] = duracao * 0.034 / 2;
+      leituras[i] = medirDistancia();
 
       vTaskDelay(pdMS_TO_TICKS(50)); // intervalo entre leituras
     }
