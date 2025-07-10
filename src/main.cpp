@@ -1,11 +1,11 @@
 #include "tasks.hpp"
+#include "ultrassom_interrupcao.hpp"
 
 void setup() {
   Serial.begin(115200); // configura o serial
   pinMode(PIN_UMIDADE_SOLO, INPUT); // configura o pino para o sensor de umidade do solo
   pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
-  pinMode(PIN_ECHO, INPUT);//configura o pino echo do sensor ultrassonico
-  pinMode(PIN_TRIG, OUTPUT);//configura o pino trig do sensor ultrassonico
+  setupUltrassom(PIN_TRIG, PIN_ECHO); // configura os pinos do sensor ultrassonico
   pinMode(PIN_RELE, OUTPUT); //configura o pino do relé
   // cria as filas
   fila_umidade_solo = xQueueCreate(5, sizeof(int));
