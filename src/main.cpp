@@ -14,6 +14,7 @@ void setup() {
   fila_dados_irrigacao = xQueueCreate(5, sizeof(DadosIrrigacao));
   // cria as tasks
   xTaskCreatePinnedToCore(vTaskSolo, "TASK_SOLO", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleSoloTask, 1);
+  xTaskCreatePinnedToCore(vTaskMotor, "TASK_MOTOR", configMINIMAL_STACK_SIZE + 1024, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(vTaskChuva, "TASK_CHUVA", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleChuvaTask, 1);
   xTaskCreatePinnedToCore(vTaskIrrigacao, "TASK_IRRIGACAO", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleIrrigacaoTask, 0);
   xTaskCreatePinnedToCore(vTaskNivelAgua, "TASK_NIVEL_AGUA", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleNivelAgua, 1);
@@ -21,5 +22,5 @@ void setup() {
 }
 
 void loop() {
-  vTaskDelay(pdMS_TO_TICKS(500));
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
