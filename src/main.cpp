@@ -19,6 +19,10 @@ void setup() {
   xTaskCreatePinnedToCore(vTaskIrrigacao, "TASK_IRRIGACAO", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleIrrigacaoTask, 0);
   xTaskCreatePinnedToCore(vTaskNivelAgua, "TASK_NIVEL_AGUA", configMINIMAL_STACK_SIZE + 2048, NULL, 1, &handleNivelAgua, 1);
   xTaskCreatePinnedToCore(vTaskComunicacao, "TASK_WIFI", configMINIMAL_STACK_SIZE + 2028, NULL, 1, &handleComunicacao, 0);
+  // configura o watchdog
+  esp_task_wdt_init(5, true); // inicia o watchdog com 5 segundos de timeout
+  esp_task_wdt_add(handleIrrigacaoTask);
+  esp_task_wdt_add(handleComunicacao);
 }
 
 void loop() {
