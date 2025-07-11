@@ -9,6 +9,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <algorithm>
+#include <ArduinoJson.h>
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
@@ -44,10 +45,14 @@ typedef struct {
     int umidade_solo;
     int estado_chuva;
     float nivel_agua;
+    int status_bomba;
+    int status_lona;
 } DadosIrrigacao;
 
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters);
+// Task para fazer o motor se movimentar
+void vTaskMotor(void *pvParameters);
 // Task para realizar a leitura do sensor de chuva
 void vTaskChuva(void *pvParameters);
 // Task para realizar a leitura do sensor ultrassônico
