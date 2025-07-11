@@ -10,6 +10,7 @@
 #include <HTTPClient.h>
 #include <algorithm>
 #include <ArduinoJson.h>
+#include "esp_task_wdt.h"
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
@@ -47,6 +48,7 @@ typedef struct {
     float nivel_agua;
     int status_bomba;
     int status_lona;
+    int status_solo;
 } DadosIrrigacao;
 
 // Task para realizar a leitura do sensor de umidade do solo
