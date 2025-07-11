@@ -80,6 +80,7 @@ AccelStepper stepper(AccelStepper::FULL4WIRE, PIN_IN1, PIN_IN3, PIN_IN2, PIN_IN4
 void vTaskMotor(void *pvParameters) {
   while (1) {
     stepper.run();
+    esp_task_wdt_reset();  // alimenta o watchdog
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
