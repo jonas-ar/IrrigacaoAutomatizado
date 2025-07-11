@@ -125,20 +125,31 @@ void vTaskIrrigacao(void *pvParameters) {
       if (nivel_medicao >= 21.0) {
         dados.status_bomba = 0; // 0 significa que a bomba está desligada
         digitalWrite(PIN_RELE, LOW);
-      } else if (solo_medicao > 2500) {
+      } else if (solo_medicao > 1800) {
         dados.status_bomba = 1; // 1 significa que a bomba está ligada
         digitalWrite(PIN_RELE, HIGH);
       } else {
         dados.status_bomba = 0; // 0 significa que a bomba está desligada
         digitalWrite(PIN_RELE, LOW);
-      }      
+      }
 
+      // faz o controle do status de nível do solo
+      if (solo_medicao > 1800) {
+        dados.status_solo = 0; // solo seco
+      } else if (solo_medicao >= 1000) {
+        dados.status_solo = 1; // solo úmido
+      } else {
+        dados.status_solo = 2; // solo encharcado, crítico
+      }
+
+      // envia os dados para a fila
       xQueueSend(fila_dados_irrigacao, &dados, portMAX_DELAY);
 
     } else {
       ESP_LOGE("Medição", "dados não disponíveis");
     }
 
+    esp_task_wdt_reset(); // alimenta o watchdog
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 };
@@ -190,6 +201,7 @@ void vTaskComunicacao(void *pvParameters) {
       doc["chuva"] = dados.estado_chuva;
       doc["status_bomba"] = dados.status_bomba;
       doc["status_lona"] = dados.status_lona;
+      doc["status_solo"] = dados.status_solo;
       doc["nivel_agua"] = dados.nivel_agua;
 
       // converte para string
@@ -207,6 +219,7 @@ void vTaskComunicacao(void *pvParameters) {
       http.end();
     }
 
+    esp_task_wdt_reset(); // alimenta o watchdog
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
