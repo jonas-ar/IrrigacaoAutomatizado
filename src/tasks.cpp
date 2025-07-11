@@ -76,6 +76,14 @@ void vTaskNivelAgua(void *pvParameters) {
 // instância do motor
 AccelStepper stepper(AccelStepper::FULL4WIRE, PIN_IN1, PIN_IN3, PIN_IN2, PIN_IN4);
 
+// Task para fazer o motor se movimetar
+void vTaskMotor(void *pvParameters) {
+  while (1) {
+    stepper.run();
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
 // Task para realizar a irrigação
 void vTaskIrrigacao(void *pvParameters) {
   int solo_medicao;
@@ -87,58 +95,43 @@ void vTaskIrrigacao(void *pvParameters) {
   stepper.setAcceleration(200);
   stepper.setSpeed(50);
   bool lonaFechada = false;
+  DadosIrrigacao dados;
+  dados.status_lona = 1;  // status padrão, 1 significa que a lona está aberta
 
   while(1) {
     if (xQueueReceive(fila_umidade_solo, &solo_medicao, portMAX_DELAY) &&
         xQueueReceive(fila_chuva, &estado_chuva, portMAX_DELAY) &&
         xQueueReceive(fila_nivel_agua, &nivel_medicao, portMAX_DELAY)) {
-
-      // Serial.printf("Valor bruto do sensor de umidade do solo: %d \n", solo_medicao);
-      // Serial.printf("Valor bruto do sensor de chuva (0 chovendo, 1 sem chover): %d \n", estado_chuva);
-      // Serial.printf("Distância em cm: %f\n\n", nivel_medicao);
-
-      if (nivel_medicao >= 21.0) {
-        // Serial.println("Nível de água CRÍTICO, a bomba será desligada.");
-        digitalWrite(PIN_RELE, LOW);
-      } else if (solo_medicao > 2500) {
-        // Serial.println("Solo seco detectado. Bomba ligada para irrigação.");
-        digitalWrite(PIN_RELE, HIGH);
-      } else {
-        // Serial.println("Solo úmido. Bomba desligada.");
-        digitalWrite(PIN_RELE, LOW);
-      }
-    
+          
       // se estiver chovendo e o estado atual da lona for aberta, será fechado
       if (estado_chuva == 0 && !lonaFechada) {
-        // Serial.println("Está chovendo! acionando cobertura...");
-        stepper.moveTo(stepper.currentPosition() + 2048); // fecha a cobertura
-
-        while (stepper.distanceToGo() != 0) {
-          stepper.run();
-          vTaskDelay(pdMS_TO_TICKS(1)); // libera CPU
-        }
-
+        dados.status_lona = 0; // 0 significa que a lona está fechada
+        stepper.moveTo(stepper.currentPosition() + 4096); // fecha a cobertura
         lonaFechada = true;
       }
 
       // se a chuva parar e o estado atual da lona for fechado, será aberto
       if (estado_chuva == 1 && lonaFechada) {
-        // Serial.println("Parou de chover! abrindo cobertura...");
-        stepper.moveTo(stepper.currentPosition() - 2048); // abre a cobertura
-
-        while (stepper.distanceToGo() != 0) {
-          stepper.run();
-          vTaskDelay(pdMS_TO_TICKS(1)); // libera CPU
-        }
-
+        dados.status_lona = 1; // 1 significa que a lona está aberta
+        stepper.moveTo(stepper.currentPosition() - 4096); // abre a cobertura girando no sentido contrário
         lonaFechada = false;
       }
 
       // envia os dados para a task de comunicação
-      DadosIrrigacao dados; // faz a instância
       dados.umidade_solo = solo_medicao;
       dados.nivel_agua = nivel_medicao;
       dados.estado_chuva = estado_chuva;
+
+      if (nivel_medicao >= 21.0) {
+        dados.status_bomba = 0; // 0 significa que a bomba está desligada
+        digitalWrite(PIN_RELE, LOW);
+      } else if (solo_medicao > 2500) {
+        dados.status_bomba = 1; // 1 significa que a bomba está ligada
+        digitalWrite(PIN_RELE, HIGH);
+      } else {
+        dados.status_bomba = 0; // 0 significa que a bomba está desligada
+        digitalWrite(PIN_RELE, LOW);
+      }      
 
       xQueueSend(fila_dados_irrigacao, &dados, portMAX_DELAY);
 
@@ -164,6 +157,26 @@ void vTaskComunicacao(void *pvParameters) {
   Serial.println("\nWi-Fi conectado.");
   
   while(1) {
+    // lida com falhas de conexão
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Wi-fi Desconectado. Tentando a reconexão...");
+      WiFi.disconnect();
+      WiFi.begin(ssid, senha);
+      int tentativas = 0;
+      while (WiFi.status() != WL_CONNECTED && tentativas < 10) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        Serial.print(".");
+        tentativas++;
+      }
+      if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nReconectado");
+      } else {
+        Serial.println("\nFalha na reconexão.");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        continue;
+      }
+    }
+    // recebe os dados da fila de irrigação
     if (xQueueReceive(fila_dados_irrigacao, &dados, portMAX_DELAY)) {
       Serial.println("Dados recebidos para envio por HTTP");
 
@@ -172,10 +185,17 @@ void vTaskComunicacao(void *pvParameters) {
       http.addHeader("Content-Type", "application/json");
 
       // monta o json
-      String json = String("{\"umidade\":") + dados.umidade_solo +
-                    ",\"chuva\":" + dados.estado_chuva +
-                    ",\"nivel_agua\":" + dados.nivel_agua + "}";
+      JsonDocument doc;
+      doc["umidade"] = dados.umidade_solo;
+      doc["chuva"] = dados.estado_chuva;
+      doc["status_bomba"] = dados.status_bomba;
+      doc["status_lona"] = dados.status_lona;
+      doc["nivel_agua"] = dados.nivel_agua;
 
+      // converte para string
+      String json;
+      serializeJson(doc, json);
+      // envia por http
       int response = http.POST(json);
 
       if (response > 0) {
