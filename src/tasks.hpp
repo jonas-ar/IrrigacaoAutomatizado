@@ -49,6 +49,7 @@ typedef struct {
     int status_bomba;
     int status_lona;
     int status_solo;
+    int status_wifi;
 } DadosIrrigacao;
 
 // Task para realizar a leitura do sensor de umidade do solo
