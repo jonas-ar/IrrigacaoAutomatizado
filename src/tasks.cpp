@@ -191,6 +191,7 @@ void vTaskComunicacao(void *pvParameters) {
     // recebe os dados da fila de irrigação
     if (xQueueReceive(fila_dados_irrigacao, &dados, portMAX_DELAY)) {
       Serial.println("Dados recebidos para envio por HTTP");
+      dados.status_wifi = WiFi.RSSI(); // exibe em dBm a qualidade do sinal wi-fi
 
       HTTPClient http;
       http.begin(url);
@@ -203,6 +204,7 @@ void vTaskComunicacao(void *pvParameters) {
       doc["status_bomba"] = dados.status_bomba;
       doc["status_lona"] = dados.status_lona;
       doc["status_solo"] = dados.status_solo;
+      doc["status_wifi"] = dados.status_wifi;
       doc["nivel_agua"] = dados.nivel_agua;
 
       // converte para string
