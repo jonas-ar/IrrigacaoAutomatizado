@@ -17,6 +17,11 @@ TaskHandle_t handleIrrigacaoTask;
 TaskHandle_t handleNivelAgua;
 TaskHandle_t handleComunicacao;
 
+enum LonaControlState { AUTOMATIC, MANUAL_OVERRIDE };
+LonaControlState lonaState = AUTOMATIC;
+unsigned long manualOverrideStartTime = 0;
+const unsigned long manualOverrideDuration = 3600000; // 1 hora em milissegundos
+
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters) {
   while (1) {
@@ -88,6 +93,7 @@ void vTaskIrrigacao(void *pvParameters) {
   int solo_medicao;
   int estado_chuva;
   float nivel_medicao;
+  RemoteCommand cmd;
 
   // configurações do motor de passo
   stepper.setMaxSpeed(500);
@@ -98,54 +104,83 @@ void vTaskIrrigacao(void *pvParameters) {
   dados.status_lona = 1;  // status padrão, 1 significa que a lona está aberta
 
   while(1) {
-    if (xQueueReceive(fila_umidade_solo, &solo_medicao, portMAX_DELAY) &&
+    if (xQueueReceive(fila_comandos_remotos, &cmd, (TickType_t)0) == pdTRUE) {
+      Serial.printf("Comando recebido na vTaskIrrigacao: %s\n", cmd.action);
+      if (strcmp(cmd.action, "WATER_PUMP") == 0) {
+          Serial.println("Acionando a bomba de agua manualmente...");
+          digitalWrite(PIN_RELE, HIGH);
+          vTaskDelay(pdMS_TO_TICKS(5000)); // Liga por 5 segundos
+          digitalWrite(PIN_RELE, LOW);
+      } else if (strcmp(cmd.action, "TOGGLE_COVER") == 0) {
+          Serial.println("Acionando a lona manualmente...");
+          if (lonaFechada) {
+              stepper.moveTo(stepper.currentPosition() - 4096); // Abre
+          } else {
+              stepper.moveTo(stepper.currentPosition() + 4096); // Fecha
+          }
+          lonaState = MANUAL_OVERRIDE; // Ativa o modo manual
+          manualOverrideStartTime = millis(); // Marca o tempo
+      }
+    }
+
+    // Verifica se o tempo de override manual já expirou
+    if (lonaState == MANUAL_OVERRIDE && (millis() - manualOverrideStartTime > manualOverrideDuration)) {
+        Serial.println("Override manual da lona expirou. Retornando ao modo automatico.");
+        lonaState = AUTOMATIC;
+    }
+
+    // Tenta receber os dados dos sensores
+    if (xQueueReceive(fila_umidade_solo, &solo_medicao, pdMS_TO_TICKS(10)) &&
         xQueueReceive(fila_chuva, &estado_chuva, portMAX_DELAY) &&
         xQueueReceive(fila_nivel_agua, &nivel_medicao, portMAX_DELAY)) {
-          
-      // se estiver chovendo e o estado atual da lona for aberta, será fechado
-      if (estado_chuva == 0 && !lonaFechada) {
-        dados.status_lona = 0; // 0 significa que a lona está fechada
-        stepper.moveTo(stepper.currentPosition() + 4096); // fecha a cobertura
-        lonaFechada = true;
-      }
 
-      // se a chuva parar e o estado atual da lona for fechado, será aberto
-      if (estado_chuva == 1 && lonaFechada) {
-        dados.status_lona = 1; // 1 significa que a lona está aberta
-        stepper.moveTo(stepper.currentPosition() - 4096); // abre a cobertura girando no sentido contrário
-        lonaFechada = false;
-      }
+        // Lógica de controle automático da lona (SÓ RODA NO MODO AUTOMÁTICO)
+        if (lonaState == AUTOMATIC) {
+            if (estado_chuva == 0 && !lonaFechada) { // Se está chovendo e a lona está aberta
+                Serial.println("Chuva detectada. Fechando a lona automaticamente.");
+                stepper.moveTo(stepper.currentPosition() + 4096); // Fecha a lona
+                lonaFechada = true;
+            }
+            if (estado_chuva == 1 && lonaFechada) { // Se parou de chover e a lona está fechada
+                Serial.println("Chuva parou. Abrindo a lona automaticamente.");
+                stepper.moveTo(stepper.currentPosition() - 4096); // Abre a lona
+                lonaFechada = false;
+            }
+        }
+        
+      // Status da lona baseado no estado atual físico.
+        dados.status_lona = lonaFechada ? 0 : 1;
 
-      // envia os dados para a task de comunicação
-      dados.umidade_solo = solo_medicao;
-      dados.nivel_agua = nivel_medicao;
-      dados.estado_chuva = estado_chuva;
+        
+        dados.umidade_solo = solo_medicao;
+        dados.nivel_agua = nivel_medicao;
+        dados.estado_chuva = estado_chuva;
 
-      if (nivel_medicao >= 21.0) {
+        if (nivel_medicao >= 21.0) {
         dados.status_bomba = 0; // 0 significa que a bomba está desligada
-        digitalWrite(PIN_RELE, LOW);
-      } else if (solo_medicao > 1800) {
+            digitalWrite(PIN_RELE, LOW);
+        } else if (solo_medicao > 1800) {
         dados.status_bomba = 1; // 1 significa que a bomba está ligada
-        digitalWrite(PIN_RELE, HIGH);
-      } else {
+            digitalWrite(PIN_RELE, HIGH);
+        } else {
         dados.status_bomba = 0; // 0 significa que a bomba está desligada
-        digitalWrite(PIN_RELE, LOW);
-      }
+            digitalWrite(PIN_RELE, LOW);
+        }
 
       // faz o controle do status de nível do solo
-      if (solo_medicao > 1800) {
+        if (solo_medicao > 1800) {
         dados.status_solo = 0; // solo seco
-      } else if (solo_medicao >= 1000) {
+        } else if (solo_medicao >= 1000) {
         dados.status_solo = 1; // solo úmido
-      } else {
+        } else {
         dados.status_solo = 2; // solo encharcado, crítico
-      }
+        }
 
       // envia os dados para a fila
-      xQueueSend(fila_dados_irrigacao, &dados, portMAX_DELAY);
+        xQueueSend(fila_dados_irrigacao, &dados, portMAX_DELAY);
 
     } else {
-      ESP_LOGE("Medição", "dados não disponíveis");
+        ESP_LOGE("Medição", "dados nao disponíveis");
     }
 
     esp_task_wdt_reset(); // alimenta o watchdog
