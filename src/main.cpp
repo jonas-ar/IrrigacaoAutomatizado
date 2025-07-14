@@ -30,6 +30,7 @@ void setup() {
   fila_chuva = xQueueCreate(5, sizeof(int));
   fila_nivel_agua = xQueueCreate(5, sizeof(float));
   fila_dados_irrigacao = xQueueCreate(5, sizeof(DadosIrrigacao));
+  fila_comandos_remotos = xQueueCreate(5, sizeof(RemoteCommand));
   // cria as tasks
   xTaskCreatePinnedToCore(vTaskSolo, "TASK_SOLO", configMINIMAL_STACK_SIZE + 1024, NULL, 1, &handleSoloTask, 1);
   xTaskCreatePinnedToCore(vTaskMotor, "TASK_MOTOR", configMINIMAL_STACK_SIZE + 1024, NULL, 1, NULL, 0);

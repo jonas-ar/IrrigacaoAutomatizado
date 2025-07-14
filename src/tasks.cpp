@@ -183,8 +183,13 @@ void vTaskComunicacao(void *pvParameters) {
       dados.status_wifi = WiFi.RSSI(); // exibe em dBm a qualidade do sinal wi-fi
 
       HTTPClient http;
-      http.begin(deviceConfig.serverUrl.c_str());
+      String postUrl = deviceConfig.serverUrl;
+      postUrl.replace("/api", "");
+      postUrl += "/api/device/sensor-readings";
+
+      http.begin(postUrl.c_str());
       http.addHeader("Content-Type", "application/json");
+      http.addHeader("x-api-key", deviceConfig.apiKey.c_str());
 
       // monta o json
       JsonDocument doc;
@@ -211,7 +216,46 @@ void vTaskComunicacao(void *pvParameters) {
       http.end();
     }
 
+    HTTPClient http_cmd;
+    String commandUrl = deviceConfig.serverUrl;
+
+    if (commandUrl.endsWith("/api")) {
+        commandUrl += "/device/commands";
+    } else {
+        commandUrl += "/api/device/commands";
+    }
+
+    http_cmd.begin(commandUrl);
+    http_cmd.addHeader("x-api-key", deviceConfig.apiKey.c_str());
+
+    int httpCodeCmd = http_cmd.GET();
+
+    if (httpCodeCmd == HTTP_CODE_OK) {
+        String payload = http_cmd.getString();
+        Serial.println("Resposta de comandos recebida: " + payload);
+
+        JsonDocument docCmd;
+        deserializeJson(docCmd, payload);
+
+        if (!docCmd["command"].isNull()) {
+            RemoteCommand cmd;
+            strlcpy(cmd.action, docCmd["command"]["action"], sizeof(cmd.action));
+            cmd.value = docCmd["command"]["value"] | 0;
+
+            if (xQueueSend(fila_comandos_remotos, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+                Serial.println("ERRO: Fila de comandos cheia!");
+            } else {
+                Serial.printf("Comando '%s' enviado para a fila de execucao.\n", cmd.action);
+            }
+        }
+    } else if (httpCodeCmd > 0) {
+        Serial.printf("Erro ao buscar comandos, HTTP %d\n", httpCodeCmd);
+    } else {
+        Serial.printf("Erro na conexao ao buscar comandos: %s\n", http_cmd.errorToString(httpCodeCmd).c_str());
+    }
+    http_cmd.end();
+
     esp_task_wdt_reset(); // alimenta o watchdog
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(10000)); // Aumentado para 10s para não sobrecarregar o servidor
   }
 }

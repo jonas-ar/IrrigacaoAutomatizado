@@ -51,6 +51,12 @@ typedef struct {
     int status_wifi;
 } DadosIrrigacao;
 
+// Estrutura para os comandos recebidos da web
+typedef struct {
+    char action[20];
+    int value;
+} RemoteCommand;
+
 // Task para realizar a leitura do sensor de umidade do solo
 void vTaskSolo(void *pvParameters);
 // Task para fazer o motor se movimentar
