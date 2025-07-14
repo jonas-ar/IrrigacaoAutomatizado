@@ -8,10 +8,6 @@ void setup() {
 
   setupConfig(); // inicializa o sistema de preferências
   
-  Serial.println("Iniciando tentativa de conexao Wi-Fi...");
-  setupAndAttemptConnection(deviceConfig);
-  Serial.println("Conexao estabelecida. Iniciando tasks da aplicacao.");
-
   if (loadConfig(deviceConfig)) {
     Serial.println("Configuracao carregada da memoria:");
     Serial.println("SSID: " + deviceConfig.ssid);
@@ -20,6 +16,11 @@ void setup() {
   } else {
     Serial.println("Nenhuma configuracao encontrada na memoria. O dispositivo precisa ser configurado.");
   }
+  
+  Serial.println("Iniciando tentativa de conexao Wi-Fi...");
+  setupAndAttemptConnection(deviceConfig);
+  Serial.println("Conexao estabelecida. Iniciando tasks da aplicacao.");
+
 
   pinMode(PIN_UMIDADE_SOLO, INPUT); // configura o pino para o sensor de umidade do solo
   pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
