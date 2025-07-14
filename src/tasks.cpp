@@ -157,15 +157,6 @@ void vTaskIrrigacao(void *pvParameters) {
 void vTaskComunicacao(void *pvParameters) {
   DadosIrrigacao dados;
   
-  // faz a conexão com wi-fi
-  WiFi.begin(deviceConfig.ssid.c_str(), deviceConfig.password.c_str());
-  Serial.print("Conectando ao Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    vTaskDelay(pdMS_TO_TICKS(500));
-    Serial.print(".");
-  }
-  Serial.println("\nWi-Fi conectado.");
-  
   while(1) {
     // lida com falhas de conexão
     if (WiFi.status() != WL_CONNECTED) {

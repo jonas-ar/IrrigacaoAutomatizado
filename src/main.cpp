@@ -1,11 +1,16 @@
 #include "tasks.hpp"
 #include "ultrassom_interrupcao.hpp"
 #include "ConfigManager.hpp"
+#include "PairingManager.hpp"
 
 void setup() {
   Serial.begin(115200); // configura o serial
 
   setupConfig(); // inicializa o sistema de preferências
+  
+  Serial.println("Iniciando tentativa de conexao Wi-Fi...");
+  setupAndAttemptConnection(deviceConfig);
+  Serial.println("Conexao estabelecida. Iniciando tasks da aplicacao.");
 
   if (loadConfig(deviceConfig)) {
     Serial.println("Configuracao carregada da memoria:");
