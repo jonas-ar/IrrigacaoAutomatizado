@@ -1,8 +1,21 @@
 #include "tasks.hpp"
 #include "ultrassom_interrupcao.hpp"
+#include "ConfigManager.hpp"
 
 void setup() {
   Serial.begin(115200); // configura o serial
+
+  setupConfig(); // inicializa o sistema de preferências
+
+  if (loadConfig(deviceConfig)) {
+    Serial.println("Configuracao carregada da memoria:");
+    Serial.println("SSID: " + deviceConfig.ssid);
+    Serial.println("URL: " + deviceConfig.serverUrl);
+    Serial.println("API Key: " + deviceConfig.apiKey);
+  } else {
+    Serial.println("Nenhuma configuracao encontrada na memoria. O dispositivo precisa ser configurado.");
+  }
+
   pinMode(PIN_UMIDADE_SOLO, INPUT); // configura o pino para o sensor de umidade do solo
   pinMode(PIN_CHUVA, INPUT); // configura o pino para o sensor de chuva
   setupUltrassom(PIN_TRIG, PIN_ECHO); // configura os pinos do sensor ultrassonico

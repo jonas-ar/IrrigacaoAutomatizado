@@ -2,9 +2,7 @@
 #include "ultrassom_interrupcao.hpp"
 
 // dados referente ao Wi-Fi
-const char* ssid = "NOME_REDE_WIFI";
-const char* senha = "SENHA_REDE_WIFI";
-const char* url = "http://exemplo.servidor/dados";
+DeviceConfig deviceConfig;
 
 // Definição das filas
 QueueHandle_t fila_umidade_solo;
@@ -160,7 +158,7 @@ void vTaskComunicacao(void *pvParameters) {
   DadosIrrigacao dados;
   
   // faz a conexão com wi-fi
-  WiFi.begin(ssid, senha);
+  WiFi.begin(deviceConfig.ssid.c_str(), deviceConfig.password.c_str());
   Serial.print("Conectando ao Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -194,7 +192,7 @@ void vTaskComunicacao(void *pvParameters) {
       dados.status_wifi = WiFi.RSSI(); // exibe em dBm a qualidade do sinal wi-fi
 
       HTTPClient http;
-      http.begin(url);
+      http.begin(deviceConfig.serverUrl.c_str());
       http.addHeader("Content-Type", "application/json");
 
       // monta o json

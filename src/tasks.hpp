@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <ArduinoJson.h>
 #include "esp_task_wdt.h"
+#include "ConfigManager.hpp"
 
 // Definição dos pinos
 #define PIN_UMIDADE_SOLO 34
@@ -23,10 +24,8 @@
 #define PIN_IN4 15 //pinos de configuração motor de passo
 #define PIN_RELE 17
 
-// declaração de variáveis referente ao Wi-Fi
-extern const char* ssid;
-extern const char* senha;
-extern const char* url;
+// Struct para armazenar as configurações do dispositivo
+extern DeviceConfig deviceConfig;
 
 // Definição das filas
 extern xQueueHandle fila_umidade_solo;
