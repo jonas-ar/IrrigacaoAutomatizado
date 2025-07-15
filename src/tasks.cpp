@@ -198,7 +198,7 @@ void vTaskComunicacao(void *pvParameters) {
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("Wi-fi Desconectado. Tentando a reconexão...");
       WiFi.disconnect();
-      WiFi.begin(ssid, senha);
+      WiFi.begin(deviceConfig.ssid, deviceConfig.password);
       int tentativas = 0;
       while (WiFi.status() != WL_CONNECTED && tentativas < 10) {
         vTaskDelay(pdMS_TO_TICKS(500));
