@@ -9,6 +9,7 @@ QueueHandle_t fila_umidade_solo;
 QueueHandle_t fila_chuva;
 QueueHandle_t fila_nivel_agua;
 QueueHandle_t fila_dados_irrigacao;
+QueueHandle_t fila_comandos_remotos;
 
 // Handles das tasks
 TaskHandle_t handleSoloTask;
