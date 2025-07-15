@@ -32,6 +32,7 @@ extern xQueueHandle fila_umidade_solo;
 extern xQueueHandle fila_chuva;
 extern xQueueHandle fila_nivel_agua;
 extern xQueueHandle fila_dados_irrigacao;
+extern xQueueHandle fila_comandos_remotos;
 
 // Handles das tasks
 extern TaskHandle_t handleSoloTask;
