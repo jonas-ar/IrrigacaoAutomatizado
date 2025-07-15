@@ -160,7 +160,7 @@ void vTaskIrrigacao(void *pvParameters) {
         if (nivel_medicao >= 21.0) {
         dados.status_bomba = 0; // 0 significa que a bomba está desligada
             digitalWrite(PIN_RELE, LOW);
-        } else if (solo_medicao > 1800) {
+        } else if (solo_medicao > 2300) {
         dados.status_bomba = 1; // 1 significa que a bomba está ligada
             digitalWrite(PIN_RELE, HIGH);
         } else {
@@ -169,9 +169,9 @@ void vTaskIrrigacao(void *pvParameters) {
         }
 
       // faz o controle do status de nível do solo
-        if (solo_medicao > 1800) {
+        if (solo_medicao > 2300) {
         dados.status_solo = 0; // solo seco
-        } else if (solo_medicao >= 1000) {
+        } else if (solo_medicao >= 1850) {
         dados.status_solo = 1; // solo úmido
         } else {
         dados.status_solo = 2; // solo encharcado, crítico
