@@ -328,6 +328,6 @@ void vTaskComunicacao(void *pvParameters) {
     http_cmd.end();
 
     esp_task_wdt_reset(); // alimenta o watchdog
-    vTaskDelay(pdMS_TO_TICKS(10000)); // Aumentado para 10s para não sobrecarregar o servidor
+    vTaskDelay(pdMS_TO_TICKS(5000)); // ajustado para 5 segundos
   }
 }
