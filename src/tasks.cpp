@@ -108,6 +108,7 @@ void vTaskIrrigacao(void *pvParameters) {
   dados.status_lona = 1;  // status padrão, 1 significa que a lona está aberta
 
   while(1) {
+    esp_task_wdt_reset(); // alimenta o watchdog
     if (xQueueReceive(fila_comandos_remotos, &cmd, (TickType_t)0) == pdTRUE) {
       Serial.printf("Comando recebido na vTaskIrrigacao: %s\n", cmd.action);
       if (strcmp(cmd.action, "WATER_PUMP") == 0) {
@@ -133,10 +134,13 @@ void vTaskIrrigacao(void *pvParameters) {
         lonaState = AUTOMATIC;
     }
 
+    esp_task_wdt_reset(); // alimenta o watchdog
     // Tenta receber os dados dos sensores
-    if (xQueueReceive(fila_umidade_solo, &solo_medicao, pdMS_TO_TICKS(10)) &&
-        xQueueReceive(fila_chuva, &estado_chuva, portMAX_DELAY) &&
-        xQueueReceive(fila_nivel_agua, &nivel_medicao, portMAX_DELAY)) {
+    if (xQueueReceive(fila_umidade_solo, &solo_medicao, pdMS_TO_TICKS(100)) &&
+        xQueueReceive(fila_chuva, &estado_chuva, pdMS_TO_TICKS(100)) &&
+        xQueueReceive(fila_nivel_agua, &nivel_medicao, pdMS_TO_TICKS(100))) {
+
+        esp_task_wdt_reset(); // alimenta o watchdog  
 
         // Lógica de controle automático da lona (SÓ RODA NO MODO AUTOMÁTICO)
         if (lonaState == AUTOMATIC) {
@@ -197,6 +201,7 @@ void vTaskComunicacao(void *pvParameters) {
   DadosIrrigacao dados;
   
   while(1) {
+    esp_task_wdt_reset(); // alimenta o watchdog
     // Reconeção Wi-Fi se necessário
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("Wi-fi Desconectado. Tentando a reconexão...");
@@ -222,6 +227,8 @@ void vTaskComunicacao(void *pvParameters) {
         continue;
       }
     }
+
+    esp_task_wdt_reset(); // alimenta o watchdog
 
     // Recebe dados da fila de irrigação
     if (xQueueReceive(fila_dados_irrigacao, &dados, portMAX_DELAY)) {
@@ -257,6 +264,7 @@ void vTaskComunicacao(void *pvParameters) {
       // converte para string
       String json;
       serializeJson(doc, json);
+      esp_task_wdt_reset(); // alimenta o watchdog
       // envia por http
       int response = http.POST(json);
 
@@ -268,6 +276,8 @@ void vTaskComunicacao(void *pvParameters) {
 
       http.end();
     }
+
+    esp_task_wdt_reset(); // alimenta o watchdog
 
     // Comandos remotos
     String commandUrl;
