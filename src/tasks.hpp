@@ -24,6 +24,9 @@
 #define PIN_IN4 15 //pinos de configuração motor de passo
 #define PIN_RELE 17
 
+// definição do mutex
+extern SemaphoreHandle_t mutexDeviceConfig;
+
 // Struct para armazenar as configurações do dispositivo
 extern DeviceConfig deviceConfig;
 
