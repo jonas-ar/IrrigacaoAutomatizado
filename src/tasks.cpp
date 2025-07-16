@@ -18,6 +18,9 @@ TaskHandle_t handleIrrigacaoTask;
 TaskHandle_t handleNivelAgua;
 TaskHandle_t handleComunicacao;
 
+// define o mutex
+SemaphoreHandle_t mutexDeviceConfig;
+
 enum LonaControlState { AUTOMATIC, MANUAL_OVERRIDE };
 LonaControlState lonaState = AUTOMATIC;
 unsigned long manualOverrideStartTime = 0;
@@ -194,17 +197,23 @@ void vTaskComunicacao(void *pvParameters) {
   DadosIrrigacao dados;
   
   while(1) {
-    // lida com falhas de conexão
+    // Reconeção Wi-Fi se necessário
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("Wi-fi Desconectado. Tentando a reconexão...");
       WiFi.disconnect();
-      WiFi.begin(deviceConfig.ssid, deviceConfig.password);
+
+      if (xSemaphoreTake(mutexDeviceConfig, pdMS_TO_TICKS(100))) {
+        WiFi.begin(deviceConfig.ssid.c_str(), deviceConfig.password.c_str());
+        xSemaphoreGive(mutexDeviceConfig);
+      }
+
       int tentativas = 0;
       while (WiFi.status() != WL_CONNECTED && tentativas < 10) {
         vTaskDelay(pdMS_TO_TICKS(500));
         Serial.print(".");
         tentativas++;
       }
+
       if (WiFi.status() == WL_CONNECTED) {
         Serial.println("\nReconectado");
       } else {
@@ -213,21 +222,29 @@ void vTaskComunicacao(void *pvParameters) {
         continue;
       }
     }
-    // recebe os dados da fila de irrigação
+
+    // Recebe dados da fila de irrigação
     if (xQueueReceive(fila_dados_irrigacao, &dados, portMAX_DELAY)) {
       Serial.println("Dados recebidos para envio por HTTP");
-      dados.status_wifi = WiFi.RSSI(); // exibe em dBm a qualidade do sinal wi-fi
+      dados.status_wifi = WiFi.RSSI();
 
-      HTTPClient http;
-      String postUrl = deviceConfig.serverUrl;
+      String postUrl;
+      String apiKey;
+
+      if (xSemaphoreTake(mutexDeviceConfig, pdMS_TO_TICKS(100))) {
+        postUrl = deviceConfig.serverUrl;
+        apiKey = deviceConfig.apiKey;
+        xSemaphoreGive(mutexDeviceConfig);
+      }
+
       postUrl.replace("/api", "");
       postUrl += "/api/device/sensor-readings";
 
+      HTTPClient http;
       http.begin(postUrl.c_str());
       http.addHeader("Content-Type", "application/json");
-      http.addHeader("x-api-key", deviceConfig.apiKey.c_str());
+      http.addHeader("x-api-key", apiKey.c_str());
 
-      // monta o json
       JsonDocument doc;
       doc["umidade"] = dados.umidade_solo;
       doc["chuva"] = dados.estado_chuva;
@@ -252,43 +269,52 @@ void vTaskComunicacao(void *pvParameters) {
       http.end();
     }
 
-    HTTPClient http_cmd;
-    String commandUrl = deviceConfig.serverUrl;
+    // Comandos remotos
+    String commandUrl;
+    String apiKey;
 
-    if (commandUrl.endsWith("/api")) {
-        commandUrl += "/device/commands";
-    } else {
-        commandUrl += "/api/device/commands";
+    if (xSemaphoreTake(mutexDeviceConfig, pdMS_TO_TICKS(100))) {
+      commandUrl = deviceConfig.serverUrl;
+      apiKey = deviceConfig.apiKey;
+      xSemaphoreGive(mutexDeviceConfig);
     }
 
+    if (commandUrl.endsWith("/api")) {
+      commandUrl += "/device/commands";
+    } else {
+      commandUrl += "/api/device/commands";
+    }
+
+    HTTPClient http_cmd;
     http_cmd.begin(commandUrl);
-    http_cmd.addHeader("x-api-key", deviceConfig.apiKey.c_str());
+    http_cmd.addHeader("x-api-key", apiKey.c_str());
 
     int httpCodeCmd = http_cmd.GET();
 
     if (httpCodeCmd == HTTP_CODE_OK) {
-        String payload = http_cmd.getString();
-        Serial.println("Resposta de comandos recebida: " + payload);
+      String payload = http_cmd.getString();
+      Serial.println("Resposta de comandos recebida: " + payload);
 
-        JsonDocument docCmd;
-        deserializeJson(docCmd, payload);
+      JsonDocument docCmd;
+      deserializeJson(docCmd, payload);
 
-        if (!docCmd["command"].isNull()) {
-            RemoteCommand cmd;
-            strlcpy(cmd.action, docCmd["command"]["action"], sizeof(cmd.action));
-            cmd.value = docCmd["command"]["value"] | 0;
+      if (!docCmd["command"].isNull()) {
+        RemoteCommand cmd;
+        strlcpy(cmd.action, docCmd["command"]["action"], sizeof(cmd.action));
+        cmd.value = docCmd["command"]["value"] | 0;
 
-            if (xQueueSend(fila_comandos_remotos, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
-                Serial.println("ERRO: Fila de comandos cheia!");
-            } else {
-                Serial.printf("Comando '%s' enviado para a fila de execucao.\n", cmd.action);
-            }
+        if (xQueueSend(fila_comandos_remotos, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+          Serial.println("ERRO: Fila de comandos cheia!");
+        } else {
+          Serial.printf("Comando '%s' enviado para a fila de execucao.\n", cmd.action);
         }
+      }
     } else if (httpCodeCmd > 0) {
-        Serial.printf("Erro ao buscar comandos, HTTP %d\n", httpCodeCmd);
+      Serial.printf("Erro ao buscar comandos, HTTP %d\n", httpCodeCmd);
     } else {
-        Serial.printf("Erro na conexao ao buscar comandos: %s\n", http_cmd.errorToString(httpCodeCmd).c_str());
+      Serial.printf("Erro na conexao ao buscar comandos: %s\n", http_cmd.errorToString(httpCodeCmd).c_str());
     }
+
     http_cmd.end();
 
     esp_task_wdt_reset(); // alimenta o watchdog
