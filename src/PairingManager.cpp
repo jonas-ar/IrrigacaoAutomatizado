@@ -1,5 +1,6 @@
 #include "PairingManager.hpp"
 #include <WiFiManager.h>
+#include "tasks.hpp"
 
 bool shouldSaveConfig = false;
 
@@ -39,13 +40,21 @@ bool setupAndAttemptConnection(DeviceConfig &config) {
     // Se o callback foi acionado, significa que novos dados foram inseridos no portal
     if (shouldSaveConfig) {
         Serial.println("Salvando nova configuracao...");
-        // Pega os valores dos campos customizados
-        config.apiKey = custom_api_key.getValue();
-        config.serverUrl = custom_server_url.getValue();
-        // O SSID e a senha são salvos automaticamente pelo WiFiManager na memória do Wi-Fi
-        // Aqui pegamos eles para salvar em nosso ConfigManager também
-        config.ssid = WiFi.SSID();
-        config.password = WiFi.psk();
+
+        // Cria uma cópia local
+        DeviceConfig novaConfig;
+        novaConfig.apiKey = custom_api_key.getValue();
+        novaConfig.serverUrl = custom_server_url.getValue();
+        novaConfig.ssid = WiFi.SSID();
+        novaConfig.password = WiFi.psk();
+
+        // Atualiza o config global com proteção
+        if (xSemaphoreTake(mutexDeviceConfig, pdMS_TO_TICKS(100))) {
+            config = novaConfig;
+            xSemaphoreGive(mutexDeviceConfig);
+        } else {
+            Serial.println("Erro: mutex ocupado ao tentar salvar config.");
+        }
 
         saveConfig(config);
 
