@@ -132,8 +132,8 @@ void vTaskIrrigacao(void *pvParameters) {
 
     // Tenta receber os dados dos sensores
     if (xQueueReceive(fila_umidade_solo, &solo_medicao, pdMS_TO_TICKS(10)) &&
-        xQueueReceive(fila_chuva, &estado_chuva, portMAX_DELAY) &&
-        xQueueReceive(fila_nivel_agua, &nivel_medicao, portMAX_DELAY)) {
+        xQueueReceive(fila_chuva, &estado_chuva, pdMS_TO_TICKS(10)) &&
+        xQueueReceive(fila_nivel_agua, &nivel_medicao, pdMS_TO_TICKS(10))) {
 
         // Lógica de controle automático da lona (SÓ RODA NO MODO AUTOMÁTICO)
         if (lonaState == AUTOMATIC) {
