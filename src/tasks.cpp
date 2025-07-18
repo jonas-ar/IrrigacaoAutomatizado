@@ -262,8 +262,9 @@ void vTaskComunicacao(void *pvParameters) {
     }
 
     http_cmd.begin(commandUrl);
+    http_cmd.setTimeout(3000); // espera por uma resposta do servidor por no máximo 3 segundos
     http_cmd.addHeader("x-api-key", deviceConfig.apiKey.c_str());
-
+    esp_task_wdt_reset(); // alimenta o watchdog antes do GET
     int httpCodeCmd = http_cmd.GET();
 
     if (httpCodeCmd == HTTP_CODE_OK) {
@@ -289,9 +290,9 @@ void vTaskComunicacao(void *pvParameters) {
     } else {
         Serial.printf("Erro na conexao ao buscar comandos: %s\n", http_cmd.errorToString(httpCodeCmd).c_str());
     }
-    http_cmd.end();
 
-    esp_task_wdt_reset(); // alimenta o watchdog
-    vTaskDelay(pdMS_TO_TICKS(10000)); // Aumentado para 10s para não sobrecarregar o servidor
+    http_cmd.end();
+    esp_task_wdt_reset(); // alimenta o watchdog depois do GET
+    vTaskDelay(pdMS_TO_TICKS(5000)); // 5 segundos de forma a não compromenter a estabilidade do sistema
   }
 }
